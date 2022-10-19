@@ -251,6 +251,9 @@
                         <descriptor>src/assembly/package.xml</descriptor>
                     </descriptors>
                     <attach>false</attach>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
                 </configuration>
                 <executions>
                     <execution>
