@@ -127,7 +127,7 @@ public class S3SinkTask extends SinkTask {
 
       writerProvider = newRecordWriterProvider(connectorConfig);
       partitioner = newPartitioner(connectorConfig);
-      preCommitHook = newPrecommitSend(connectorConfig);
+      preCommitHook = newPreCommitHook(connectorConfig);
 
       open(context.assignment());
       try {
@@ -222,11 +222,11 @@ public class S3SinkTask extends SinkTask {
     return partitioner;
   }
 
-  private PreCommitHook newPrecommitSend(S3SinkConnectorConfig config) {
+  private PreCommitHook newPreCommitHook(S3SinkConnectorConfig config) {
     if (!config.getPrecommitKafkaBootstrapServers().isEmpty()) {
-      KafkaPreCommitHook kafkaPrecommitSend = new KafkaPreCommitHook();
-      kafkaPrecommitSend.init(config);
-      return kafkaPrecommitSend;
+      KafkaPreCommitHook kafkaPreCommitHook = new KafkaPreCommitHook();
+      kafkaPreCommitHook.init(config);
+      return kafkaPreCommitHook;
     }
     return new NoopPreCommitHook();
   }
