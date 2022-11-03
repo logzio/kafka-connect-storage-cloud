@@ -96,6 +96,11 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
 
   public static final String SSE_KMS_KEY_ID_CONFIG = "s3.sse.kms.key.id";
   public static final String SSE_KMS_KEY_ID_DEFAULT = "";
+  
+  public static final String POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS = "s3.hooks.kafka.bootstrap.servers";
+  public static final String POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS_DEFAULT = "";
+  public static final String POST_COMMIT_KAFKA_TOPIC = "s3.hooks.kafka.topic";
+  public static final String POST_COMMIT_KAFKA_TOPIC_DEFAULT = "";
 
   public static final String PART_SIZE_CONFIG = "s3.part.size";
   public static final int PART_SIZE_DEFAULT = 25 * 1024 * 1024;
@@ -314,6 +319,30 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
           Width.LONG,
           "AWS region",
           new RegionRecommender()
+      );
+
+      configDef.define(
+              POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS,
+              Type.STRING,
+              POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS_DEFAULT,
+              Importance.LOW,
+              "Kafka bootstrap brokers for post-commit",
+              group,
+              ++orderInGroup,
+              Width.LONG,
+              "Kafka bootstrap brokers for post-commit"
+      );
+
+      configDef.define(
+              POST_COMMIT_KAFKA_TOPIC,
+              Type.STRING,
+              POST_COMMIT_KAFKA_TOPIC_DEFAULT,
+              Importance.LOW,
+              "Kafka post-commit topic holding uploaded S3 object paths",
+              group,
+              ++orderInGroup,
+              Width.LONG,
+              "Kafka post-commit topic"
       );
 
       configDef.define(
@@ -780,6 +809,14 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
 
   public String getSseKmsKeyId() {
     return getString(SSE_KMS_KEY_ID_CONFIG);
+  }
+
+  public String getPostCommitKafkaBootstrapServers() {
+    return getString(POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS);
+  }
+
+  public String getPostCommitKafkaTopic() {
+    return getString(POST_COMMIT_KAFKA_TOPIC);
   }
 
   public boolean useExpectContinue() {

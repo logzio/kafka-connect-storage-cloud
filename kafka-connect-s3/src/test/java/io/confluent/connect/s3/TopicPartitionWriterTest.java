@@ -27,6 +27,7 @@ import io.confluent.connect.s3.format.RecordViewSetter;
 import io.confluent.connect.s3.format.RecordViews.HeaderRecordView;
 import io.confluent.connect.s3.format.RecordViews.KeyRecordView;
 import io.confluent.connect.s3.format.json.JsonFormat;
+import io.confluent.connect.s3.hooks.NoopPostCommitHook;
 import io.confluent.connect.s3.storage.CompressionType;
 import io.confluent.connect.storage.errors.PartitionException;
 import io.confluent.kafka.serializers.NonRecordContainer;
@@ -599,7 +600,7 @@ public class TopicPartitionWriterTest extends TestWithMockedS3 {
     Time systemTime = EasyMock.createMock(SystemTime.class);
 
     TopicPartitionWriter topicPartitionWriter = new TopicPartitionWriter(
-        TOPIC_PARTITION, storage, writerProvider, partitioner, connectorConfig, context, systemTime, null);
+        TOPIC_PARTITION, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, systemTime, null);
 
     // Freeze clock passed into topicPartitionWriter, so we know what time it will use for "now"
     long freezeTime = 3599000L;
@@ -652,7 +653,7 @@ public class TopicPartitionWriterTest extends TestWithMockedS3 {
     time.sleep(SYSTEM.milliseconds());
 
     TopicPartitionWriter topicPartitionWriter = new TopicPartitionWriter(
-        TOPIC_PARTITION, storage, writerProvider, partitioner, connectorConfig, context, time,
+        TOPIC_PARTITION, storage, writerProvider, partitioner,new NoopPostCommitHook(),  connectorConfig, context, time,
         null);
 
     // sleep for 11 minutes after startup
@@ -716,7 +717,7 @@ public class TopicPartitionWriterTest extends TestWithMockedS3 {
     time.sleep(SYSTEM.milliseconds());
 
     TopicPartitionWriter topicPartitionWriter = new TopicPartitionWriter(
-        TOPIC_PARTITION, storage, writerProvider, partitioner, connectorConfig, context, time,
+        TOPIC_PARTITION, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, time,
         null);
 
     // sleep for 11 minutes after startup
@@ -811,7 +812,7 @@ public class TopicPartitionWriterTest extends TestWithMockedS3 {
     // Bring the clock to present.
     time.sleep(SYSTEM.milliseconds());
     TopicPartitionWriter topicPartitionWriter = new TopicPartitionWriter(
-        TOPIC_PARTITION, storage, writerProvider, partitioner, connectorConfig, context, time, null);
+        TOPIC_PARTITION, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, time, null);
 
     String key = "key";
     Schema schema = createSchema();
@@ -889,7 +890,7 @@ public class TopicPartitionWriterTest extends TestWithMockedS3 {
     // Bring the clock to present.
     time.sleep(SYSTEM.milliseconds());
     TopicPartitionWriter topicPartitionWriter = new TopicPartitionWriter(
-        TOPIC_PARTITION, storage, writerProvider, partitioner, connectorConfig, context, time, null);
+        TOPIC_PARTITION, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, time, null);
 
     String key = "key";
     Schema schema = createSchema();
