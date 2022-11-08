@@ -103,18 +103,8 @@ public class TopicPartitionWriter {
   private static final Time SYSTEM_TIME = new SystemTime();
   private ErrantRecordReporter reporter;
 
-  public TopicPartitionWriter(TopicPartition tp,
-                              S3Storage storage,
-                              RecordWriterProvider<S3SinkConnectorConfig> writerProvider,
-                              Partitioner<?> partitioner,
-                              PostCommitHook postCommitHook,
-                              S3SinkConnectorConfig connectorConfig,
-                              SinkTaskContext context,
-                              ErrantRecordReporter reporter) {
-    this(tp, storage, writerProvider, partitioner, postCommitHook, connectorConfig, context, SYSTEM_TIME, reporter);
-  }
-
-  public TopicPartitionWriter(TopicPartition tp,
+  // Visible for testing
+  TopicPartitionWriter(TopicPartition tp,
                               S3Storage storage,
                               RecordWriterProvider<S3SinkConnectorConfig> writerProvider,
                               Partitioner<?> partitioner,
@@ -126,6 +116,17 @@ public class TopicPartitionWriter {
 
   // Visible for testing
   TopicPartitionWriter(TopicPartition tp,
+                              S3Storage storage,
+                              RecordWriterProvider<S3SinkConnectorConfig> writerProvider,
+                              Partitioner<?> partitioner,
+                              S3SinkConnectorConfig connectorConfig,
+                              SinkTaskContext context,
+                              Time time,
+                              ErrantRecordReporter reporter) {
+    this(tp, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, time, reporter);
+  }
+
+  public TopicPartitionWriter(TopicPartition tp,
                        S3Storage storage,
                        RecordWriterProvider<S3SinkConnectorConfig> writerProvider,
                        Partitioner<?> partitioner,

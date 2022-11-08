@@ -341,7 +341,7 @@ public class S3SinkTask extends SinkTask {
         storage,
         writerProvider,
         partitioner,
-            postCommitHook,
+        postCommitHook,
         connectorConfig,
         context,
         time,
