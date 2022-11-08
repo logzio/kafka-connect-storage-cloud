@@ -78,8 +78,8 @@ public class S3SinkTask extends SinkTask {
 
   // visible for testing.
   S3SinkTask(S3SinkConnectorConfig connectorConfig, SinkTaskContext context, S3Storage storage,
-             Partitioner<?> partitioner, PostCommitHook postCommitHook, Format<S3SinkConnectorConfig, String> format,
-             Time time) throws Exception {
+             Partitioner<?> partitioner, PostCommitHook postCommitHook,
+             Format<S3SinkConnectorConfig, String> format, Time time) {
     this.topicPartitionWriters = new HashMap<>();
     this.connectorConfig = connectorConfig;
     this.context = context;

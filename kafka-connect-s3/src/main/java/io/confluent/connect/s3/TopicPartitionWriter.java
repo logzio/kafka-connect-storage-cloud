@@ -111,7 +111,8 @@ public class TopicPartitionWriter {
                               S3SinkConnectorConfig connectorConfig,
                               SinkTaskContext context,
                               ErrantRecordReporter reporter) {
-    this(tp, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, SYSTEM_TIME, reporter);
+    this(tp, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig,
+            context, SYSTEM_TIME, reporter);
   }
 
   // Visible for testing
@@ -123,7 +124,8 @@ public class TopicPartitionWriter {
                               SinkTaskContext context,
                               Time time,
                               ErrantRecordReporter reporter) {
-    this(tp, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig, context, time, reporter);
+    this(tp, storage, writerProvider, partitioner, new NoopPostCommitHook(), connectorConfig,
+            context, time, reporter);
   }
 
   public TopicPartitionWriter(TopicPartition tp,

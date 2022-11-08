@@ -1,3 +1,7 @@
+/*
+ * Add here
+ */
+
 package io.confluent.connect.s3.hooks;
 
 import io.confluent.connect.s3.S3SinkConnectorConfig;
@@ -7,12 +11,12 @@ import io.confluent.connect.s3.S3SinkConnectorConfig;
  */
 public interface PostCommitHook {
 
-    void init(S3SinkConnectorConfig config);
+  void init(S3SinkConnectorConfig config);
 
-    /**
-     * @param s3ObjectPath uploaded s3 object path
-     */
-    void execute(String s3ObjectPath);
+  /**
+   * @param s3ObjectPath uploaded s3 object path
+   */
+  void execute(String s3ObjectPath);
 
-    void close();
+  void close();
 }
