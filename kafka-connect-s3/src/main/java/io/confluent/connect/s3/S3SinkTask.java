@@ -222,7 +222,7 @@ public class S3SinkTask extends SinkTask {
   }
 
   private PostCommitHook newPostCommitHook(S3SinkConnectorConfig config) {
-    if (!config.getPostCommitKafkaBootstrapServers().isEmpty()) {
+    if (!config.getPostCommitKafkaBootstrapBrokers().isEmpty()) {
       BlockingKafkaPostCommitHook blockingKafkaPreCommitHook = new BlockingKafkaPostCommitHook();
       blockingKafkaPreCommitHook.init(config);
       return blockingKafkaPreCommitHook;

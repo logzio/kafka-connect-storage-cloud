@@ -41,7 +41,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
     private KafkaProducer<String, String> newKafkaPostCommitProducer(S3SinkConnectorConfig config) {
         Properties props = new Properties();
-        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getPostCommitKafkaBootstrapServers());
+        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getPostCommitKafkaBootstrapBrokers());
         props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.setProperty(ProducerConfig.ACKS_CONFIG, "1");

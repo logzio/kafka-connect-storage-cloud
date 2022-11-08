@@ -97,7 +97,7 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
   public static final String SSE_KMS_KEY_ID_CONFIG = "s3.sse.kms.key.id";
   public static final String SSE_KMS_KEY_ID_DEFAULT = "";
   
-  public static final String POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS = "s3.hooks.kafka.bootstrap.servers";
+  public static final String POST_COMMIT_KAFKA_BOOTSTRAP_BROKERS = "s3.hooks.kafka.bootstrap.brokers";
   public static final String POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS_DEFAULT = "";
   public static final String POST_COMMIT_KAFKA_TOPIC = "s3.hooks.kafka.topic";
   public static final String POST_COMMIT_KAFKA_TOPIC_DEFAULT = "";
@@ -322,7 +322,7 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
       );
 
       configDef.define(
-              POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS,
+              POST_COMMIT_KAFKA_BOOTSTRAP_BROKERS,
               Type.STRING,
               POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS_DEFAULT,
               Importance.LOW,
@@ -811,8 +811,8 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
     return getString(SSE_KMS_KEY_ID_CONFIG);
   }
 
-  public String getPostCommitKafkaBootstrapServers() {
-    return getString(POST_COMMIT_KAFKA_BOOTSTRAP_SERVERS);
+  public String getPostCommitKafkaBootstrapBrokers() {
+    return getString(POST_COMMIT_KAFKA_BOOTSTRAP_BROKERS);
   }
 
   public String getPostCommitKafkaTopic() {
