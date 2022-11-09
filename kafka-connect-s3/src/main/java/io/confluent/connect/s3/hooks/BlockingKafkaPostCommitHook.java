@@ -32,7 +32,8 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   public void execute(String s3ObjectPath) {
     try {
       Future<RecordMetadata> f = kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));
-      f.get(15, TimeUnit.SECONDS);
+      RecordMetadata metadata = f.get(120, TimeUnit.SECONDS);
+      log.info("Produced successfully file: {} to: {}", s3ObjectPath, metadata);
     } catch (Exception e) {
       log.error("Failed to produce to kafka", e);
       throw new RetriableException(e);
@@ -51,7 +52,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
             StringSerializer.class.getName());
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.setProperty(ProducerConfig.ACKS_CONFIG, "1");
-    props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "internal-archiver-producer");
+    props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "blocking-kafka-producer");
 
     return new KafkaProducer<>(props);
   }
