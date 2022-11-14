@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -127,6 +126,7 @@ public class S3SinkTask extends SinkTask {
 
       writerProvider = newRecordWriterProvider(connectorConfig);
       partitioner = newPartitioner(connectorConfig);
+      postCommitHook = newPostCommitHook(connectorConfig);
 
       open(context.assignment());
       try {
@@ -158,10 +158,10 @@ public class S3SinkTask extends SinkTask {
 
   @Override
   public void open(Collection<TopicPartition> partitions) {
+    postCommitHook.init(connectorConfig, context);
     for (TopicPartition tp : partitions) {
       topicPartitionWriters.put(tp, newTopicPartitionWriter(tp));
     }
-    postCommitHook = newPostCommitHook(connectorConfig);
   }
 
   @SuppressWarnings("unchecked")
@@ -224,11 +224,7 @@ public class S3SinkTask extends SinkTask {
 
   private PostCommitHook newPostCommitHook(S3SinkConnectorConfig config) {
     if (!config.getPostCommitKafkaBootstrapBrokers().isEmpty()) {
-      BlockingKafkaPostCommitHook blockingKafkaPreCommitHook = new BlockingKafkaPostCommitHook();
-      blockingKafkaPreCommitHook.init(config, Collections.singletonMap(
-              BlockingKafkaPostCommitHook.TRANSACTIONAL_ID,
-              Integer.toString(context.assignment().hashCode())));
-      return blockingKafkaPreCommitHook;
+      return new BlockingKafkaPostCommitHook();
     }
     return new NoopPostCommitHook();
   }

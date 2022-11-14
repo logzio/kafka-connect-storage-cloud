@@ -5,8 +5,8 @@
 package io.confluent.connect.s3.hooks;
 
 import io.confluent.connect.s3.S3SinkConnectorConfig;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public interface PostCommitHook {
 
-  void init(S3SinkConnectorConfig config, Map<String, String> additionalParams);
+  void init(S3SinkConnectorConfig config, SinkTaskContext context);
 
   void put(Set<String> s3ObjectPath);
 

@@ -5,14 +5,14 @@
 package io.confluent.connect.s3.hooks;
 
 import io.confluent.connect.s3.S3SinkConnectorConfig;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 
-import java.util.Map;
 import java.util.Set;
 
 public class NoopPostCommitHook implements PostCommitHook {
 
   @Override
-  public void init(S3SinkConnectorConfig config, Map<String, String> additionalParams) {
+  public void init(S3SinkConnectorConfig config, SinkTaskContext context) {
 
   }
 

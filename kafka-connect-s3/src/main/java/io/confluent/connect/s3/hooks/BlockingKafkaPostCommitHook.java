@@ -18,18 +18,16 @@ import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.IllegalWorkerStateException;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.kafka.connect.errors.RetriableException;
 
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
 public class BlockingKafkaPostCommitHook implements PostCommitHook {
-
-  public static final String TRANSACTIONAL_ID = "name";
 
   private static final Logger log = LoggerFactory.getLogger(BlockingKafkaPostCommitHook.class);
   private String kafkaTopic;
@@ -37,9 +35,12 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private KafkaProducer<String, String> kafkaProducer;
 
   @Override
-  public void init(S3SinkConnectorConfig config, Map<String, String> additionalParams) {
+  public void init(S3SinkConnectorConfig config, SinkTaskContext context) {
+    if (kafkaProducer != null) {
+      close();
+    }
     kafkaTopic = config.getPostCommitKafkaTopic();
-    transactionalId = additionalParams.get(TRANSACTIONAL_ID);
+    transactionalId = Integer.toString(context.assignment().hashCode());
     kafkaProducer = newKafkaPostCommitProducer(config);
   }
 
@@ -114,6 +115,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     } catch (Exception e) {
       log.error("Failed to close kafka producer", e);
     }
+    kafkaProducer = null;
   }
 
   private KafkaProducer<String, String> newKafkaPostCommitProducer(S3SinkConnectorConfig config) {
