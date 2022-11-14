@@ -109,13 +109,16 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     }
   }
 
+  @Override
   public void close() {
-    try {
-      kafkaProducer.close();
-    } catch (Exception e) {
-      log.error("Failed to close kafka producer", e);
+    if (kafkaProducer != null) {
+      try {
+        kafkaProducer.close();
+      } catch (Exception e) {
+        log.error("Failed to close kafka producer", e);
+      }
+      kafkaProducer = null;
     }
-    kafkaProducer = null;
   }
 
   private KafkaProducer<String, String> newKafkaPostCommitProducer(S3SinkConnectorConfig config) {
