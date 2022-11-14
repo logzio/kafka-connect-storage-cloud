@@ -23,10 +23,9 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.kafka.connect.errors.RetriableException;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
@@ -36,30 +35,19 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private String kafkaTopic;
   private String transactionalId;
   private KafkaProducer<String, String> kafkaProducer;
-  private List<String> s3ObjectPaths;
 
   @Override
   public void init(S3SinkConnectorConfig config, Map<String, String> additionalParams) {
     kafkaTopic = config.getPostCommitKafkaTopic();
     transactionalId = additionalParams.get(TRANSACTIONAL_ID);
     kafkaProducer = newKafkaPostCommitProducer(config);
-    s3ObjectPaths = new ArrayList<>();
   }
 
   @Override
-  public void put(List<String> s3ObjectPaths) {
-    this.s3ObjectPaths.addAll(s3ObjectPaths);
-  }
-
-  @Override
-  public void flush() {
-    try {
-      beginTransaction();
-      sendRecords();
-      commitTransaction();
-    } finally {
-      s3ObjectPaths.clear();
-    }
+  public void put(Set<String> s3ObjectPaths) {
+    beginTransaction();
+    sendRecords(s3ObjectPaths);
+    commitTransaction();
   }
 
   private void beginTransaction() {
@@ -77,7 +65,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     }
   }
 
-  private void sendRecords() {
+  private void sendRecords(Set<String> s3ObjectPaths) {
     try {
       for (String s3ObjectPath : s3ObjectPaths) {
         kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));

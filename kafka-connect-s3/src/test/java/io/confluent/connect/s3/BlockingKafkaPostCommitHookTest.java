@@ -73,8 +73,8 @@ public class BlockingKafkaPostCommitHookTest extends DataWriterTestBase<AvroForm
     task.stop();
   }
 
-  private List<String> getExpectedFiles(long startOffset, TopicPartition tp) {
-    List<String> expectedFiles = new ArrayList<>();
+  private Set<String> getExpectedFiles(long startOffset, TopicPartition tp) {
+    Set<String> expectedFiles = new HashSet<>();
     expectedFiles.add(FileUtils.fileKeyToCommit(
             topicsDir,
             getDirectory(tp.topic(), tp.partition()),

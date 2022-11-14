@@ -35,9 +35,9 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Optional;
@@ -635,8 +635,7 @@ public class TopicPartitionWriter {
       }
     }
 
-    postCommitHook.put(new ArrayList<>(commitFiles.values()));
-    postCommitHook.flush();
+    postCommitHook.put(new HashSet<>(commitFiles.values()));
 
     for (Map.Entry<String, String> entry : commitFiles.entrySet()) {
       String encodedPartition = entry.getKey();
