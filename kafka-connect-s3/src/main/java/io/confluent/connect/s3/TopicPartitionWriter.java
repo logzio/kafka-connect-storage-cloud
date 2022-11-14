@@ -35,6 +35,7 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -632,7 +633,13 @@ public class TopicPartitionWriter {
                 connectorConfig.getLong(S3_RETRY_BACKOFF_CONFIG)
         );
       }
-      postCommitHook.execute(entry.getValue());
+    }
+
+    postCommitHook.put(new ArrayList<>(commitFiles.values()));
+    postCommitHook.flush();
+
+    for (Map.Entry<String, String> entry : commitFiles.entrySet()) {
+      String encodedPartition = entry.getKey();
       startOffsets.remove(encodedPartition);
       endOffsets.remove(encodedPartition);
       recordCounts.remove(encodedPartition);

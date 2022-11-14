@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -224,7 +225,9 @@ public class S3SinkTask extends SinkTask {
   private PostCommitHook newPostCommitHook(S3SinkConnectorConfig config) {
     if (!config.getPostCommitKafkaBootstrapBrokers().isEmpty()) {
       BlockingKafkaPostCommitHook blockingKafkaPreCommitHook = new BlockingKafkaPostCommitHook();
-      blockingKafkaPreCommitHook.init(config);
+      blockingKafkaPreCommitHook.init(config, Collections.singletonMap(
+              BlockingKafkaPostCommitHook.TRANSACTIONAL_ID,
+              Integer.toString(context.assignment().hashCode())));
       return blockingKafkaPreCommitHook;
     }
     return new NoopPostCommitHook();
@@ -316,6 +319,7 @@ public class S3SinkTask extends SinkTask {
       }
     }
     topicPartitionWriters.clear();
+    postCommitHook.close();
   }
 
   @Override

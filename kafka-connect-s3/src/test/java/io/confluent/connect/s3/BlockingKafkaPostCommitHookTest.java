@@ -34,19 +34,17 @@ public class BlockingKafkaPostCommitHookTest extends DataWriterTestBase<AvroForm
     localProps.put(S3SinkConnectorConfig.FLUSH_SIZE_CONFIG, "3");
 
     setUp();
-    BlockingKafkaPostCommitHook kafkaPreCommitSend = Mockito.mock(BlockingKafkaPostCommitHook.class);
-    InOrder inOrder = Mockito.inOrder(kafkaPreCommitSend);
-    task = new S3SinkTask(connectorConfig, context, storage, partitioner, kafkaPreCommitSend, format, SYSTEM_TIME);
+    BlockingKafkaPostCommitHook kafkaPostCommitSend = Mockito.mock(BlockingKafkaPostCommitHook.class);
+    InOrder inOrder = Mockito.inOrder(kafkaPostCommitSend);
+    task = new S3SinkTask(connectorConfig, context, storage, partitioner, kafkaPostCommitSend, format, SYSTEM_TIME);
 
     List<SinkRecord> sinkRecords1 = createRecordsInterleaved(3 * partitions.size(), 0, partitions);
 
     task.put(sinkRecords1);
     task.preCommit(null);
 
-    List<String> expectedFilesSet1 = getExpectedFiles(0, partitions);
-    for (String file: expectedFilesSet1) {
-      inOrder.verify(kafkaPreCommitSend).execute(file);
-    }
+    inOrder.verify(kafkaPostCommitSend).put(getExpectedFiles(0, TOPIC_PARTITION));
+    inOrder.verify(kafkaPostCommitSend).put(getExpectedFiles(0, TOPIC_PARTITION2));
 
     List<SinkRecord> sinkRecords2 = createRecordsInterleaved(2 * partitions.size(), 3, partitions);
 
@@ -60,10 +58,8 @@ public class BlockingKafkaPostCommitHookTest extends DataWriterTestBase<AvroForm
     task.put(sinkRecords3);
     task.preCommit(null);
 
-    List<String> expectedFilesSet3 = getExpectedFiles(3, partitions);
-    for (String file: expectedFilesSet3) {
-      inOrder.verify(kafkaPreCommitSend).execute(file);
-    }
+    inOrder.verify(kafkaPostCommitSend).put(getExpectedFiles(3, TOPIC_PARTITION));
+    inOrder.verify(kafkaPostCommitSend).put(getExpectedFiles(3, TOPIC_PARTITION2));
 
     List<SinkRecord> sinkRecords4 = createRecordsInterleaved(3 * partitions.size(), 6, partitions);
 
@@ -71,25 +67,20 @@ public class BlockingKafkaPostCommitHookTest extends DataWriterTestBase<AvroForm
     task.put(sinkRecords4.subList(0, 3 * partitions.size() - 1));
     task.preCommit(null);
 
-    List<String> expectedFilesSet4 = getExpectedFiles(6, Collections.singleton(TOPIC_PARTITION));
-    for (String file: expectedFilesSet4) {
-      inOrder.verify(kafkaPreCommitSend).execute(file);
-    }
+    inOrder.verify(kafkaPostCommitSend).put(getExpectedFiles(6, TOPIC_PARTITION));
 
     task.close(partitions);
     task.stop();
   }
 
-  private List<String> getExpectedFiles(long startOffset, Collection<TopicPartition> partitions) {
+  private List<String> getExpectedFiles(long startOffset, TopicPartition tp) {
     List<String> expectedFiles = new ArrayList<>();
-    for (TopicPartition tp : partitions) {
-      expectedFiles.add(FileUtils.fileKeyToCommit(
-              topicsDir,
-              getDirectory(tp.topic(), tp.partition()),
-              tp,
-              startOffset,
-              EXTENSION, ZERO_PAD_FMT));
-    }
+    expectedFiles.add(FileUtils.fileKeyToCommit(
+            topicsDir,
+            getDirectory(tp.topic(), tp.partition()),
+            tp,
+            startOffset,
+            EXTENSION, ZERO_PAD_FMT));
     return expectedFiles;
   }
 
