@@ -127,7 +127,6 @@ public class S3SinkTask extends SinkTask {
 
       writerProvider = newRecordWriterProvider(connectorConfig);
       partitioner = newPartitioner(connectorConfig);
-      postCommitHook = newPostCommitHook(connectorConfig);
 
       open(context.assignment());
       try {
@@ -162,6 +161,7 @@ public class S3SinkTask extends SinkTask {
     for (TopicPartition tp : partitions) {
       topicPartitionWriters.put(tp, newTopicPartitionWriter(tp));
     }
+    postCommitHook = newPostCommitHook(connectorConfig);
   }
 
   @SuppressWarnings("unchecked")
