@@ -53,9 +53,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       log.info("Beginning transaction for: {}", transactionalId);
 
       for (String s3ObjectPath : s3ObjectPaths) {
-        ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, s3ObjectPath);
-        record.headers().add(new RecordHeader("accountId", "300".getBytes()));
-        kafkaProducer.send(record);
+        kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));
       }
 
       kafkaProducer.commitTransaction();
