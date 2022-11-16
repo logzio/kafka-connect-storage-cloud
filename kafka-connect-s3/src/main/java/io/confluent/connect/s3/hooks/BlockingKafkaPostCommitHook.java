@@ -48,60 +48,24 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   @Override
   public void put(Set<String> s3ObjectPaths) {
-    beginTransaction();
-    sendRecords(s3ObjectPaths);
-    commitTransaction();
-  }
-
-  private void beginTransaction() {
     try {
       kafkaProducer.beginTransaction();
       log.info("Beginning transaction for: {}", transactionalId);
+
+      for (String s3ObjectPath : s3ObjectPaths) {
+        ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, s3ObjectPath);
+        record.headers().add(new RecordHeader("accountId", "300".getBytes()));
+        kafkaProducer.send(record);
+      }
+
+      kafkaProducer.commitTransaction();
+      log.info("committed transaction {} successfully", transactionalId);
     } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
-            | IllegalWorkerStateException e) {
+             | IllegalStateException | OutOfOrderSequenceException e) {
       log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
       throw new ConnectException(e);
     } catch (KafkaException e) {
       log.error("Failed to begin transaction", e);
-      kafkaProducer.abortTransaction();
-      throw new RetriableException(e);
-    }
-  }
-
-  private void sendRecords(Set<String> s3ObjectPaths) {
-    try {
-      for (String s3ObjectPath : s3ObjectPaths) {
-        kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));
-      }
-    } catch (IllegalWorkerStateException e) {
-      log.error("Failed to send record because no transaction.id or "
-              + "initTransaction() wasn't called", e);
-      throw new ConnectException(e);
-    } catch (ProducerFencedException | OutOfOrderSequenceException | AuthorizationException
-             | UnsupportedVersionException e) {
-      log.error("Failed to send with unrecoverable exception, closing producer", e);
-      throw new ConnectException(e);
-    } catch (KafkaException e) {
-      log.error("Failed to send aborting transaction, going to retry later", e);
-      kafkaProducer.abortTransaction();
-      throw new RetriableException(e);
-    }
-  }
-
-  private void commitTransaction() {
-    try {
-      kafkaProducer.commitTransaction();
-      log.info("committed transaction {} successfully", transactionalId);
-    } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
-             | IllegalWorkerStateException e) {
-      log.error("Failed to commit transaction with unrecoverable exception, "
-              + "closing producer", e);
-      throw new ConnectException(e);
-    } catch (TimeoutException | InterruptException e) {
-      log.error("Failed to commit transaction due to timeout or interrupt", e);
-      throw new ConnectException(e);
-    } catch (KafkaException e) {
-      log.error("aborting transaction, going to retry later", e);
       kafkaProducer.abortTransaction();
       throw new RetriableException(e);
     }
