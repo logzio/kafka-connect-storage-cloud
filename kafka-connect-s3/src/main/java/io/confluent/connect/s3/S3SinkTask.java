@@ -327,7 +327,6 @@ public class S3SinkTask extends SinkTask {
       if (storage != null) {
         storage.close();
       }
-      postCommitHook.close();
     } catch (Exception e) {
       throw new ConnectException(e);
     }
