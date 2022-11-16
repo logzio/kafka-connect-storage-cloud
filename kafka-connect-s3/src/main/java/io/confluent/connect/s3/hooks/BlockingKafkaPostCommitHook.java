@@ -15,6 +15,7 @@ import org.apache.kafka.common.errors.OutOfOrderSequenceException;
 import org.apache.kafka.common.errors.ProducerFencedException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.IllegalWorkerStateException;
@@ -42,6 +43,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     kafkaTopic = config.getPostCommitKafkaTopic();
     transactionalId = Integer.toString(context.assignment().hashCode());
     kafkaProducer = newKafkaPostCommitProducer(config);
+    log.info("BlockingKafkaPostCommitHook initialized successfully");
   }
 
   @Override
@@ -54,14 +56,14 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private void beginTransaction() {
     try {
       kafkaProducer.beginTransaction();
-      log.info("Beginning transaction for: {}", "kafkaProducerTransactionalId");
+      log.info("Beginning transaction for: {}", transactionalId);
     } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
             | IllegalWorkerStateException e) {
       log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
-      kafkaProducer.close();
       throw new ConnectException(e);
     } catch (KafkaException e) {
       log.error("Failed to begin transaction", e);
+      kafkaProducer.abortTransaction();
       throw new RetriableException(e);
     }
   }
@@ -74,12 +76,10 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     } catch (IllegalWorkerStateException e) {
       log.error("Failed to send record because no transaction.id or "
               + "initTransaction() wasn't called", e);
-      kafkaProducer.close();
       throw new ConnectException(e);
     } catch (ProducerFencedException | OutOfOrderSequenceException | AuthorizationException
              | UnsupportedVersionException e) {
       log.error("Failed to send with unrecoverable exception, closing producer", e);
-      kafkaProducer.close();
       throw new ConnectException(e);
     } catch (KafkaException e) {
       log.error("Failed to send aborting transaction, going to retry later", e);
@@ -91,16 +91,14 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private void commitTransaction() {
     try {
       kafkaProducer.commitTransaction();
-      log.info("committed transaction successfully");
+      log.info("committed transaction {} successfully", transactionalId);
     } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
              | IllegalWorkerStateException e) {
       log.error("Failed to commit transaction with unrecoverable exception, "
               + "closing producer", e);
-      kafkaProducer.close();
       throw new ConnectException(e);
     } catch (TimeoutException | InterruptException e) {
       log.error("Failed to commit transaction due to timeout or interrupt", e);
-      kafkaProducer.close();
       throw new ConnectException(e);
     } catch (KafkaException e) {
       log.error("aborting transaction, going to retry later", e);
