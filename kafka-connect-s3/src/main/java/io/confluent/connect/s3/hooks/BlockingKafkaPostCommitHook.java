@@ -5,6 +5,7 @@
 package io.confluent.connect.s3.hooks;
 
 import io.confluent.connect.s3.S3SinkConnectorConfig;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -13,7 +14,6 @@ import org.apache.kafka.common.errors.AuthorizationException;
 import org.apache.kafka.common.errors.OutOfOrderSequenceException;
 import org.apache.kafka.common.errors.ProducerFencedException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
@@ -76,7 +76,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
             StringSerializer.class.getName());
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-    String id = "blocking-kafka-producer-" + ((int)(Math.random() * Integer.MAX_VALUE));
+    String id = "blocking-kafka-producer-" + RandomStringUtils.randomAlphabetic(6);
     props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, id);
     props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, id);
     props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "10");
