@@ -83,7 +83,9 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
     KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props);
     try {
+      log.info("stating to initialize transactions");
       kafkaProducer.initTransactions();
+      log.info("Transactions initialized");
     } catch (Exception e) {
       log.error("Failed to initiate transaction context", e);
       throw new ConnectException(e);
