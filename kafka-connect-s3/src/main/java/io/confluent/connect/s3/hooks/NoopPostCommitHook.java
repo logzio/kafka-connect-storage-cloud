@@ -12,7 +12,7 @@ import java.util.Set;
 public class NoopPostCommitHook implements PostCommitHook {
 
   @Override
-  public void init(S3SinkConnectorConfig config, SinkTaskContext context) {
+  public void init(S3SinkConnectorConfig config) {
 
   }
 

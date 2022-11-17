@@ -29,16 +29,14 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   private static final Logger log = LoggerFactory.getLogger(BlockingKafkaPostCommitHook.class);
   private String kafkaTopic;
-  private String transactionalId;
   private KafkaProducer<String, String> kafkaProducer;
 
   @Override
-  public void init(S3SinkConnectorConfig config, SinkTaskContext context) {
+  public void init(S3SinkConnectorConfig config) {
     if (kafkaProducer != null) {
       close();
     }
     kafkaTopic = config.getPostCommitKafkaTopic();
-    transactionalId = Integer.toString(context.assignment().hashCode());
     kafkaProducer = newKafkaPostCommitProducer(config);
     log.info("BlockingKafkaPostCommitHook initialized successfully");
   }
@@ -47,14 +45,16 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   public void put(Set<String> s3ObjectPaths) {
     try {
       kafkaProducer.beginTransaction();
-      log.info("Beginning transaction for: {}", transactionalId);
+      log.info("Transaction began");
 
       for (String s3ObjectPath : s3ObjectPaths) {
-        kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));
+        ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, s3ObjectPath);
+        record.headers().add(new RecordHeader("accountId", "300".getBytes()));
+        kafkaProducer.send(record);
       }
 
       kafkaProducer.commitTransaction();
-      log.info("committed transaction {} successfully", transactionalId);
+      log.info("Transaction committed");
     } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
              | IllegalStateException | OutOfOrderSequenceException e) {
       log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
@@ -85,17 +85,17 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
             StringSerializer.class.getName());
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-    props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "blocking-kafka-producer-"
-            + transactionalId);
+    String id = "blocking-kafka-producer-" + ((int)(Math.random()*Integer.MAX_VALUE));
+    props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, id);
+    props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, id);
     props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "10");
-    props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
 
     KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props);
     try {
       kafkaProducer.initTransactions();
     } catch (Exception e) {
       log.error("Failed to initiate transaction context", e);
-      throw e;
+      throw new ConnectException(e);
     }
     return kafkaProducer;
   }

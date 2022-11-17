@@ -126,7 +126,7 @@ public class S3SinkTask extends SinkTask {
 
       writerProvider = newRecordWriterProvider(connectorConfig);
       partitioner = newPartitioner(connectorConfig);
-      postCommitHook = newPostCommitHook(connectorConfig);
+      postCommitHook = createAndInitPostCommitHook(connectorConfig);
 
       open(context.assignment());
       try {
@@ -158,7 +158,6 @@ public class S3SinkTask extends SinkTask {
 
   @Override
   public void open(Collection<TopicPartition> partitions) {
-    postCommitHook.init(connectorConfig, context);
     for (TopicPartition tp : partitions) {
       topicPartitionWriters.put(tp, newTopicPartitionWriter(tp));
     }
@@ -222,7 +221,13 @@ public class S3SinkTask extends SinkTask {
     return partitioner;
   }
 
-  private PostCommitHook newPostCommitHook(S3SinkConnectorConfig config) {
+  private PostCommitHook createAndInitPostCommitHook(S3SinkConnectorConfig config) {
+    PostCommitHook postCommitHook = createPostCommitHook(config);
+    postCommitHook.init(config);
+    return postCommitHook;
+  }
+
+  private PostCommitHook createPostCommitHook(S3SinkConnectorConfig config) {
     if (!config.getPostCommitKafkaBootstrapBrokers().trim().isEmpty()
             && !config.getPostCommitKafkaTopic().trim().isEmpty()) {
       log.info("Going to use BlockingKafkaPostCommitHook, sending to topic: {}",
@@ -319,12 +324,12 @@ public class S3SinkTask extends SinkTask {
       }
     }
     topicPartitionWriters.clear();
-    postCommitHook.close();
   }
 
   @Override
   public void stop() {
     try {
+      postCommitHook.close();
       if (storage != null) {
         storage.close();
       }
