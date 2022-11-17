@@ -32,9 +32,6 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   @Override
   public void init(S3SinkConnectorConfig config) {
-    if (kafkaProducer != null) {
-      close();
-    }
     kafkaTopic = config.getPostCommitKafkaTopic();
     kafkaProducer = newKafkaPostCommitProducer(config);
     log.info("BlockingKafkaPostCommitHook initialized successfully");
@@ -47,9 +44,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       log.info("Transaction began");
 
       for (String s3ObjectPath : s3ObjectPaths) {
-        ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, s3ObjectPath);
-        record.headers().add(new RecordHeader("accountId", "300".getBytes()));
-        kafkaProducer.send(record);
+        kafkaProducer.send(new ProducerRecord<>(kafkaTopic, s3ObjectPath));
       }
 
       kafkaProducer.commitTransaction();
@@ -59,7 +54,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
       throw new ConnectException(e);
     } catch (KafkaException e) {
-      log.error("Failed to begin transaction", e);
+      log.error("Failed to produce to kafka, aborting transaction and will try again later", e);
       kafkaProducer.abortTransaction();
       throw new RetriableException(e);
     }
@@ -67,13 +62,10 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   @Override
   public void close() {
-    if (kafkaProducer != null) {
-      try {
-        kafkaProducer.close();
-      } catch (Exception e) {
-        log.error("Failed to close kafka producer", e);
-      }
-      kafkaProducer = null;
+    try {
+      kafkaProducer.close();
+    } catch (Exception e) {
+      log.error("Failed to close kafka producer", e);
     }
   }
 
