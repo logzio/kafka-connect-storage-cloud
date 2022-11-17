@@ -16,7 +16,6 @@ import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +84,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
             StringSerializer.class.getName());
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-    String id = "blocking-kafka-producer-" + ((int)(Math.random()*Integer.MAX_VALUE));
+    String id = "blocking-kafka-producer-" + ((int)(Math.random() * Integer.MAX_VALUE));
     props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, id);
     props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, id);
     props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "10");

@@ -5,7 +5,6 @@
 package io.confluent.connect.s3.hooks;
 
 import io.confluent.connect.s3.S3SinkConnectorConfig;
-import org.apache.kafka.connect.sink.SinkTaskContext;
 
 import java.util.Set;
 
