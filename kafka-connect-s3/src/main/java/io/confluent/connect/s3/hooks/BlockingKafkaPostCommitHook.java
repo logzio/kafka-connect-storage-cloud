@@ -77,7 +77,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       for (String s3ObjectPath : s3ObjectPaths) {
         List<Header> headers = new ArrayList<>();
         headers.add(new RecordHeader("accountId", getAccountId(s3ObjectPath).getBytes()));
-        headers.add(new RecordHeader("timestamp",
+        headers.add(new RecordHeader("fileTimeStamp",
                 roundTimeToPartitonTime(baseRecordTimestamp).getBytes()));
         headers.add(new RecordHeader("pathHash",
                 getPathHash(s3ObjectPath).getBytes()));
