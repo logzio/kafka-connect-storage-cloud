@@ -118,7 +118,10 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   }
 
   private String getPathHash(String s3ObjectPath) {
-    return Md5Utils.md5AsBase64(s3ObjectPath.getBytes()).substring(0, 16);
+    return Md5Utils.md5AsBase64(s3ObjectPath.getBytes()).substring(0, 16)
+            // Escape the base64 + and / to safe URL characters
+            .replace("+", "A")
+            .replace("/", "B");
   }
 
   private String getAccountId(String s3ObjectPath) {
