@@ -6,6 +6,7 @@ package io.confluent.connect.s3.hooks;
 
 import com.amazonaws.util.Md5Utils;
 import io.confluent.connect.s3.S3SinkConnectorConfig;
+import io.confluent.connect.storage.common.StorageCommonConfig;
 import io.confluent.connect.storage.partitioner.Partitioner;
 import io.confluent.connect.storage.partitioner.PartitionerConfig;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -42,10 +43,11 @@ import java.util.regex.Pattern;
 public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   private static final Logger log = LoggerFactory.getLogger(BlockingKafkaPostCommitHook.class);
-  private static final Pattern pattern = Pattern.compile("topics/(\\d+)/");
   private static final DateTimeFormatter timeFormatter =
           DateTimeFormatter.ofPattern("yyMMdd'T'HHmm00");
-  private long partitioneDurationMinutes;
+  private Pattern pattern;
+
+  private long partitionDurationMinutes;
   private String kafkaTopic;
   private KafkaProducer<String, String> kafkaProducer;
 
@@ -62,7 +64,16 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
               + " io.logz.kafka.connect.FieldAndTimeBasedPartitioner partitioner");
     }
 
-    partitioneDurationMinutes = TimeUnit.MILLISECONDS.toMinutes(60000);
+    String topicsDir = config.getString(StorageCommonConfig.TOPICS_DIR_CONFIG);
+    pattern = Pattern.compile(topicsDir + "/(\\d+)/");
+
+    long rotateScheduleMS = config.getLong(
+            S3SinkConnectorConfig.ROTATE_SCHEDULE_INTERVAL_MS_CONFIG);
+    partitionDurationMinutes = TimeUnit.MILLISECONDS.toMinutes(rotateScheduleMS);
+    if (partitionDurationMinutes < 1) {
+      throw new IllegalArgumentException("rotate.schedule.interval.ms must be bigger than 1"
+              + " minute to use this hook");
+    }
     kafkaTopic = config.getPostCommitKafkaTopic();
     kafkaProducer = newKafkaPostCommitProducer(config);
     log.info("BlockingKafkaPostCommitHook initialized successfully");
@@ -102,7 +113,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     LocalDateTime localDateTime = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(baseRecordTimestamp), ZoneOffset.UTC);
     LocalDateTime roundedDateTime = localDateTime.truncatedTo(ChronoUnit.HOURS).plusMinutes(
-            (localDateTime.getMinute() / partitioneDurationMinutes) * partitioneDurationMinutes);
+            (localDateTime.getMinute() / partitionDurationMinutes) * partitionDurationMinutes);
     return roundedDateTime.format(timeFormatter);
   }
 
