@@ -44,7 +44,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   private static final Logger log = LoggerFactory.getLogger(BlockingKafkaPostCommitHook.class);
   private static final DateTimeFormatter timeFormatter =
-          DateTimeFormatter.ofPattern("yyMMdd'T'HHmm00");
+          DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:00");
   private Pattern pattern;
 
   private long partitionDurationMinutes;
