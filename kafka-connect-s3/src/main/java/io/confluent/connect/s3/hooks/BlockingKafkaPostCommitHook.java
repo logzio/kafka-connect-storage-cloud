@@ -100,6 +100,9 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   }
 
   private String getLocalDateTime(String s3ObjectPath, Long baseRecordTimestamp) {
+    if (baseRecordTimestamp == null) {
+      return null;
+    }
     LocalDateTime localDateTime = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(baseRecordTimestamp), ZoneOffset.UTC);
 

@@ -628,16 +628,18 @@ public class TopicPartitionWriter {
 
   private void updateBaseRecordTimestampOfEncodedPartition(SinkRecord record,
                                                            String encodedPartition) {
-    Long timestamp = encodedPartitionToEarliestRecordTimestamp.get(encodedPartition);
-    if (timestamp == null) {
-      encodedPartitionToEarliestRecordTimestamp.put(encodedPartition,
-              timestampExtractor.extract(record));
-      return;
-    }
-    Long recordTimestamp = timestampExtractor.extract(record);
-    if (recordTimestamp < timestamp) {
-      encodedPartitionToEarliestRecordTimestamp.put(encodedPartition,
-              timestampExtractor.extract(record));
+    if (timestampExtractor != null) {
+      Long timestamp = encodedPartitionToEarliestRecordTimestamp.get(encodedPartition);
+      if (timestamp == null) {
+        encodedPartitionToEarliestRecordTimestamp.put(encodedPartition,
+                timestampExtractor.extract(record));
+        return;
+      }
+      Long recordTimestamp = timestampExtractor.extract(record);
+      if (recordTimestamp < timestamp) {
+        encodedPartitionToEarliestRecordTimestamp.put(encodedPartition,
+                timestampExtractor.extract(record));
+      }
     }
   }
 
