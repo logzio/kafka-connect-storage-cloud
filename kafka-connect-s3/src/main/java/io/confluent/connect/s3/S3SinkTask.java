@@ -67,7 +67,7 @@ public class S3SinkTask extends SinkTask {
   private RecordWriterProvider<S3SinkConnectorConfig> writerProvider;
   private final Time time;
   private ErrantRecordReporter reporter;
-  private final AtomicBoolean stopping = new AtomicBoolean(false);
+  private final AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
 
   /**
    * No-arg constructor. Used by Connect framework.
@@ -112,7 +112,7 @@ public class S3SinkTask extends SinkTask {
       url = connectorConfig.getString(StorageCommonConfig.STORE_URL_CONFIG);
       timeoutMs = connectorConfig.getLong(S3SinkConnectorConfig.RETRY_BACKOFF_CONFIG);
 
-      Runtime.getRuntime().addShutdownHook(new Thread(() -> stopping.set(true)));
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> shutdownInitiated.set(true)));
 
       @SuppressWarnings("unchecked")
       Class<? extends S3Storage> storageClass =
@@ -309,12 +309,12 @@ public class S3SinkTask extends SinkTask {
   ) {
     Map<TopicPartition, OffsetAndMetadata> offsetsToCommit = new HashMap<>();
 
-    if (stopping.get()) {
+    if (shutdownInitiated.get()) {
       log.info("Flushing local data into S3 and committing offsets due to connector shutdown");
     }
 
     for (TopicPartition tp : topicPartitionWriters.keySet()) {
-      if (stopping.get()) {
+      if (shutdownInitiated.get()) {
         flushToS3(tp);
       }
       Long offset = topicPartitionWriters.get(tp).getOffsetToCommitAndReset();
