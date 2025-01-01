@@ -49,20 +49,8 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   @Override
   public void init(S3SinkConnectorConfig config) {
-    @SuppressWarnings("unchecked")
-    Class<? extends Partitioner<?>> partitionerClass =
-            (Class<? extends Partitioner<?>>) config.getClass(
-                    PartitionerConfig.PARTITIONER_CLASS_CONFIG);
-
-    if (partitionerClass == null || !partitionerClass.getName().equals(
-            "io.logz.kafka.connect.FieldAndTimeBasedPartitioner")) {
-      throw new IllegalArgumentException("This post commit hook can be used ony with"
-              + " io.logz.kafka.connect.FieldAndTimeBasedPartitioner partitioner");
-    }
-
     String topicsDir = config.getString(StorageCommonConfig.TOPICS_DIR_CONFIG);
     pattern = Pattern.compile(topicsDir + "/(\\d+)/");
-
     kafkaTopic = config.getPostCommitKafkaTopic();
     kafkaProducer = newKafkaPostCommitProducer(config);
     log.info("BlockingKafkaPostCommitHook initialized successfully");

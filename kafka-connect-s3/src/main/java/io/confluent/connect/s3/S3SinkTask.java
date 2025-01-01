@@ -36,6 +36,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.confluent.common.utils.SystemTime;
 import io.confluent.common.utils.Time;
@@ -66,6 +67,7 @@ public class S3SinkTask extends SinkTask {
   private RecordWriterProvider<S3SinkConnectorConfig> writerProvider;
   private final Time time;
   private ErrantRecordReporter reporter;
+  private final AtomicBoolean stopping = new AtomicBoolean(false);
 
   /**
    * No-arg constructor. Used by Connect framework.
@@ -109,6 +111,8 @@ public class S3SinkTask extends SinkTask {
       connectorConfig = new S3SinkConnectorConfig(props);
       url = connectorConfig.getString(StorageCommonConfig.STORE_URL_CONFIG);
       timeoutMs = connectorConfig.getLong(S3SinkConnectorConfig.RETRY_BACKOFF_CONFIG);
+
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> stopping.set(true)));
 
       @SuppressWarnings("unchecked")
       Class<? extends S3Storage> storageClass =
@@ -304,7 +308,15 @@ public class S3SinkTask extends SinkTask {
       Map<TopicPartition, OffsetAndMetadata> offsets
   ) {
     Map<TopicPartition, OffsetAndMetadata> offsetsToCommit = new HashMap<>();
+
+    if (stopping.get()) {
+      log.info("Flushing local data into S3 and committing offsets due to connector shutdown");
+    }
+
     for (TopicPartition tp : topicPartitionWriters.keySet()) {
+      if (stopping.get()) {
+        flushToS3(tp);
+      }
       Long offset = topicPartitionWriters.get(tp).getOffsetToCommitAndReset();
       if (offset != null) {
         log.trace("Forwarding to framework request to commit offset: {} for {}", offset, tp);
@@ -329,7 +341,10 @@ public class S3SinkTask extends SinkTask {
   @Override
   public void stop() {
     try {
-      postCommitHook.close();
+      if (postCommitHook != null) {
+        postCommitHook.close();
+      }
+
       if (storage != null) {
         storage.close();
       }
@@ -341,6 +356,14 @@ public class S3SinkTask extends SinkTask {
   // Visible for testing
   TopicPartitionWriter getTopicPartitionWriter(TopicPartition tp) {
     return topicPartitionWriters.get(tp);
+  }
+
+  private void flushToS3(TopicPartition tp) {
+    try {
+      topicPartitionWriters.get(tp).commitFiles();
+    } catch (Exception e) {
+      log.error("Error flushing {} local data into S3", tp, e);
+    }
   }
 
   private TopicPartitionWriter newTopicPartitionWriter(TopicPartition tp) {

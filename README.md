@@ -1,6 +1,4 @@
 # Kafka Connect Connector for S3
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fconfluentinc%2Fkafka-connect-storage-cloud.svg?type=shield)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fconfluentinc%2Fkafka-connect-storage-cloud?ref=badge_shield)
-
 
 *kafka-connect-storage-cloud* is the repository for Confluent's [Kafka Connectors](http://kafka.apache.org/documentation.html#connect)
 designed to be used to copy data from Kafka into Amazon S3. 
@@ -11,34 +9,34 @@ Documentation for this connector can be found [here](http://docs.confluent.io/cu
 
 Blogpost for this connector can be found [here](https://www.confluent.io/blog/apache-kafka-to-amazon-s3-exactly-once).
 
-# Development
+# Build
 
-To build a development version you'll need a recent version of Kafka 
-as well as a set of upstream Confluent projects, which you'll have to build from their appropriate snapshot branch.
-See [the kafka-connect-storage-common FAQ](https://github.com/confluentinc/kafka-connect-storage-common/wiki/FAQ)
-for guidance on this process.
+Kafka Connect Storage Common modules use a few dependencies which we sometimes use SNAPSHOT versions of. We do this during the development of a new release in order to build and test against new features. If you want to build a development version, you may need to build and install these dependencies to your local Maven repository in order to build the connector:
 
-You can build *kafka-connect-storage-cloud* with Maven using the standard lifecycle phases.
+- **Kafka** - clone https://github.com/confluentinc/kafka/ and build with `./gradlew build -x test` & `./gradlew -PskipSigning=true publishToMavenLocal`
+- **Common** - clone https://github.com/confluentinc/common and build with `mvn install -DskipTests`
+- **Rest Utils** - clone https://github.com/confluentinc/rest-utils and build with `mvn install -DskipTests`
+- **Avro converter** - clone https://github.com/confluentinc/schema-registry and build with `mvn install -DskipTests`
 
-# Running Integration Tests
-Integration tests are run as part of `mvn install`; however one needs to first configure the environment variable`AWS_CREDENTIALS_PATH` to point to a json file path with following structure:
-```
-{
-    "aws_access_key_id": "<key>",
-    "aws_secret_access_key": "<secret>"
-}
-```
+Then, to build Kafka Connect Storage Common modules and make them available to storage sink connectors, do the same on the current repo:
+- **Kafka Connect Storage Common** - clone https://github.com/logzio/kafka-connect-storage-common and build with `mvn install -DskipTests -Dcheckstyle.skip=true`
 
-# Contribute
+# Packing
 
-- Source Code: https://github.com/confluentinc/kafka-connect-storage-cloud
-- Issue Tracker: https://github.com/confluentinc/kafka-connect-storage-cloud/issues
-- Learn how to work with the connector's source code by reading our [Development and Contribution guidelines](CONTRIBUTING.md).
+In order to publish a docker image for a connector using this repository,
+you need to pack the code into a fat jar.
+To do this, run the following command:
 
+`mvn clean package -Dcheckstyle.skip=true`
 
-# License
+# Publish
 
-This project is licensed under the [Confluent Community License](LICENSE).
+You can publish multiple connectors with different configurations, 
+In this guide we will take our `internal-archiver` connector as an example.
 
+1. Copy the jar from `kafka-connect-s3/target/kafka-connect-s3-<version>-jar-with-dependencies.jar` to replace current jar in the [docker image](https://github.com/logzio/docker-additional/tree/master/external-images/logzio-internal-archiver).
+2. Create a new tag for the docker image with the new version by changing [this](https://github.com/logzio/docker-additional/blob/master/external-images/logzio-internal-archiver/build.bash#L3) version.
+3. Push the new tag to the docker registry by running [./build.bash](https://github.com/logzio/docker-additional/blob/master/external-images/logzio-internal-archiver/build.bash#L3).
 
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fconfluentinc%2Fkafka-connect-storage-cloud.svg?type=large)](https://app.fossa.io/projects/git%2Bhttps%3A%2F%2Fgithub.com%2Fconfluentinc%2Fkafka-connect-storage-cloud?ref=badge_large)
+> [!WARNING]  
+> Make sure to update the version in the [build.bash](https://github.com/logzio/docker-additional/blob/master/external-images/logzio-internal-archiver/build.bash#L3) file before running it, because it can override the current image.
