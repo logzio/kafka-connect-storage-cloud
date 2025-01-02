@@ -309,12 +309,24 @@ public class S3SinkTask extends SinkTask {
   ) {
     Map<TopicPartition, OffsetAndMetadata> offsetsToCommit = new HashMap<>();
 
+    /* Most of the time, `offsets` contains all `topicPartitionWriters` (on regular flush intervals & when closing the connector).
+     * However, in case of a revoked partition/s, `offsets` will contain only topic partitions that are going to be revoked.
+     * In such cases, we need to flush the local data into S3 and commit the offset.
+     * We can detect this by checking if the number of `topicPartitionWriters` is greater than the number of `offsets`.
+     */
+    boolean revokeInitiated = topicPartitionWriters.size() > offsets.size();
+
+    if (revokeInitiated) {
+      log.info("Flushing local data into S3 and committing offsets due to partition revoke");
+    }
+
     if (shutdownInitiated.get()) {
       log.info("Flushing local data into S3 and committing offsets due to connector shutdown");
     }
 
     for (TopicPartition tp : topicPartitionWriters.keySet()) {
-      if (shutdownInitiated.get()) {
+      boolean partitionRevoked = revokeInitiated && offsets.containsKey(tp);
+      if (shutdownInitiated.get() || partitionRevoked) {
         flushToS3(tp);
       }
       Long offset = topicPartitionWriters.get(tp).getOffsetToCommitAndReset();
