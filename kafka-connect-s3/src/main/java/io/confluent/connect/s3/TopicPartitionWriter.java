@@ -651,7 +651,7 @@ public class TopicPartitionWriter {
     }
   }
 
-  private void commitFiles() {
+  protected void commitFiles() {
     for (Map.Entry<String, String> entry : commitFiles.entrySet()) {
       String encodedPartition = entry.getKey();
       commitFile(encodedPartition);
