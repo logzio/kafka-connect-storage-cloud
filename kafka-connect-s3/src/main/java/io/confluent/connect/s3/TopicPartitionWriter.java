@@ -652,6 +652,11 @@ public class TopicPartitionWriter {
   }
 
   protected void commitFiles() {
+    if (currentOffset == -1) {
+      log.debug("No records to commit for {}", tp);
+      return;
+    }
+
     for (Map.Entry<String, String> entry : commitFiles.entrySet()) {
       String encodedPartition = entry.getKey();
       commitFile(encodedPartition);
