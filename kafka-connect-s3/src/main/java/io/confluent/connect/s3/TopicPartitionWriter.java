@@ -651,7 +651,7 @@ public class TopicPartitionWriter {
     }
   }
 
-  protected void commitFiles() {
+  protected synchronized void commitFiles() {
     if (currentOffset == -1) {
       log.debug("No records to commit for {}", tp);
       return;
