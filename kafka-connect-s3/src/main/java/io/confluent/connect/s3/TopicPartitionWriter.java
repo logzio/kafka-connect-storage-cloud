@@ -355,7 +355,7 @@ public class TopicPartitionWriter {
     if (buffer.isEmpty()) {
       // committing files after waiting for rotateIntervalMs time but less than flush.size
       // records available
-      if (recordCount > 0 && rotateOnTime(currentEncodedPartition, currentTimestamp, now)) {
+      if (rotateOnTime(currentEncodedPartition, currentTimestamp, now)) {
         log.info(
             "Committing files after waiting for rotateIntervalMs time but less than flush.size "
             + "records available. recordCount: {}, encodedPartition: {}",
@@ -423,9 +423,6 @@ public class TopicPartitionWriter {
   }
 
   private boolean rotateOnTime(String encodedPartition, Long recordTimestamp, long now) {
-    if (recordCount <= 0) {
-      return false;
-    }
     // rotateIntervalMs > 0 implies timestampExtractor != null
     boolean periodicRotation = rotateIntervalMs > 0
         && timestampExtractor != null
@@ -651,9 +648,16 @@ public class TopicPartitionWriter {
     }
   }
 
-  protected void commitFiles() {
+  protected synchronized void commitFiles() {
     if (currentOffset == -1) {
       log.debug("No records to commit for {}", tp);
+      return;
+    }
+
+    // Make sure to commit the offset to kafka in case kafka fails after the commit to S3
+    if (recordCount == 0) {
+      log.info("No File to commit to S3. Target commit offset for {} is {}", tp, offsetToCommit);
+      offsetToCommit = currentOffset + 1;
       return;
     }
 
