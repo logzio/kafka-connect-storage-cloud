@@ -221,8 +221,6 @@ public class TopicPartitionWriter {
       failureTime = -1;
     }
 
-    resetExpiredScheduledRotationIfNoPendingRecords(now);
-
     while (!buffer.isEmpty()) {
       try {
         executeState(now);
@@ -368,12 +366,6 @@ public class TopicPartitionWriter {
 
       resume();
       setState(State.WRITE_STARTED);
-    }
-  }
-
-  private void resetExpiredScheduledRotationIfNoPendingRecords(long now) {
-    if (recordCount == 0 && shouldApplyScheduledRotation(now)) {
-      setNextScheduledRotation();
     }
   }
 
@@ -656,8 +648,8 @@ public class TopicPartitionWriter {
 
     // Make sure to commit the offset to kafka in case kafka fails after the commit to S3
     if (recordCount == 0) {
-      log.info("No File to commit to S3. Target commit offset for {} is {}", tp, offsetToCommit);
       offsetToCommit = currentOffset + 1;
+      log.info("No files to commit to S3. Target commit offset for {} is {}", tp, offsetToCommit);
       return;
     }
 
