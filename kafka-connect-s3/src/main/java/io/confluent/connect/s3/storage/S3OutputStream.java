@@ -27,6 +27,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.SSEAlgorithm;
+import com.amazonaws.services.s3.model.StorageClass;
 import com.amazonaws.services.s3.model.SSEAwsKeyManagementParams;
 import com.amazonaws.services.s3.model.SSECustomerKey;
 import com.amazonaws.services.s3.model.UploadPartRequest;
@@ -59,6 +60,7 @@ public class S3OutputStream extends PositionOutputStream {
   private final ProgressListener progressListener;
   private final int partSize;
   private final CannedAccessControlList cannedAcl;
+  private final StorageClass storageClass;
   private boolean closed;
   private final ByteBuf buffer;
   private MultipartUpload multiPartUpload;
@@ -79,6 +81,7 @@ public class S3OutputStream extends PositionOutputStream {
     this.sseKmsKeyId = conf.getSseKmsKeyId();
     this.partSize = conf.getPartSize();
     this.cannedAcl = conf.getCannedAcl();
+    this.storageClass = conf.getStorageClass();
     this.closed = false;
 
     final boolean elasticBufEnable = conf.getElasticBufferEnable();
@@ -174,6 +177,9 @@ public class S3OutputStream extends PositionOutputStream {
         PutObjectRequest req = new PutObjectRequest(bucket, key,
                 new ByteArrayInputStream(buffer.array(), 0, buffer.position()), metadata)
                 .withCannedAcl(cannedAcl);
+        if (storageClass != null) {
+          req.setStorageClass(storageClass.toString());
+        }
         if (sseCustomerKey != null) {
           req.withSSECustomerKey(sseCustomerKey);
         }
@@ -229,6 +235,10 @@ public class S3OutputStream extends PositionOutputStream {
         key,
         newObjectMetadata()
     ).withCannedACL(cannedAcl);
+
+    if (storageClass != null) {
+      initRequest.setStorageClass(storageClass);
+    }
 
     if (SSEAlgorithm.KMS.toString().equalsIgnoreCase(ssea)
         && StringUtils.isNotBlank(sseKmsKeyId)) {

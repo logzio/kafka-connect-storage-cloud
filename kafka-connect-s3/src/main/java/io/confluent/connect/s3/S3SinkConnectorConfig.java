@@ -24,6 +24,7 @@ import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.SSEAlgorithm;
+import com.amazonaws.services.s3.model.StorageClass;
 import io.confluent.connect.storage.common.util.StringUtils;
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.config.AbstractConfig;
@@ -133,6 +134,9 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
 
   public static final String ACL_CANNED_CONFIG = "s3.acl.canned";
   public static final String ACL_CANNED_DEFAULT = null;
+
+  public static final String STORAGE_CLASS_CONFIG = "s3.storage.class";
+  public static final String STORAGE_CLASS_DEFAULT = null;
 
   public static final String COMPRESSION_TYPE_CONFIG = "s3.compression.type";
   public static final String COMPRESSION_TYPE_DEFAULT = "none";
@@ -466,6 +470,19 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
           ++orderInGroup,
           Width.LONG,
           "S3 Canned ACL"
+      );
+
+      configDef.define(
+          STORAGE_CLASS_CONFIG,
+          Type.STRING,
+          STORAGE_CLASS_DEFAULT,
+          new StorageClassValidator(),
+          Importance.LOW,
+          "The S3 storage class for uploaded objects. If not set, defaults to STANDARD.",
+          group,
+          ++orderInGroup,
+          Width.LONG,
+          "S3 Storage Class"
       );
 
       configDef.define(
@@ -828,6 +845,12 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
     return CannedAclValidator.ACLS_BY_HEADER_VALUE.get(getString(ACL_CANNED_CONFIG));
   }
 
+  public StorageClass getStorageClass() {
+    String val = getString(STORAGE_CLASS_CONFIG);
+    return val == null ? null
+        : StorageClassValidator.STORAGE_CLASSES_BY_VALUE.get(val);
+  }
+
   public String awsAccessKeyId() {
     return getString(AWS_ACCESS_KEY_ID_CONFIG);
   }
@@ -1134,6 +1157,40 @@ public class S3SinkConnectorConfig extends StorageSinkConnectorConfig {
       String aclStr = ((String) cannedAcl).trim();
       if (!ACLS_BY_HEADER_VALUE.containsKey(aclStr)) {
         throw new ConfigException(name, cannedAcl, "Value must be one of: " + ALLOWED_VALUES);
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "[" + ALLOWED_VALUES + "]";
+    }
+  }
+
+  private static class StorageClassValidator implements ConfigDef.Validator {
+    public static final Map<String, StorageClass> STORAGE_CLASSES_BY_VALUE = new HashMap<>();
+    public static final String ALLOWED_VALUES;
+
+    static {
+      List<String> values = new ArrayList<>();
+      for (StorageClass sc : StorageClass.values()) {
+        STORAGE_CLASSES_BY_VALUE.put(sc.toString(), sc);
+        values.add(sc.toString());
+      }
+      ALLOWED_VALUES = Utils.join(values, ", ");
+    }
+
+    @Override
+    public void ensureValid(String name, Object storageClass) {
+      if (storageClass == null) {
+        return;
+      }
+      String str = ((String) storageClass).trim();
+      if (str.isEmpty()) {
+        return;
+      }
+      if (!STORAGE_CLASSES_BY_VALUE.containsKey(str)) {
+        throw new ConfigException(name, storageClass,
+            "Value must be one of: " + ALLOWED_VALUES);
       }
     }
 
