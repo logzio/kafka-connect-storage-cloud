@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.kafka.connect.errors.RetriableException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -43,8 +44,11 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private static final Logger log = LoggerFactory.getLogger(BlockingKafkaPostCommitHook.class);
   private static final DateTimeFormatter timeFormatter =
           DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+  private static final Duration PRODUCER_CLOSE_TIMEOUT = Duration.ofSeconds(30);
+  private static final Duration PRODUCER_INIT_FAILURE_CLOSE_TIMEOUT = Duration.ofSeconds(5);
   private Pattern pattern;
   private String kafkaTopic;
+  private S3SinkConnectorConfig config;
   private KafkaProducer<String, String> kafkaProducer;
 
   @Override
@@ -52,6 +56,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     String topicsDir = config.getString(StorageCommonConfig.TOPICS_DIR_CONFIG);
     pattern = Pattern.compile(topicsDir + "/(\\d+)/");
     kafkaTopic = config.getPostCommitKafkaTopic();
+    this.config = config;
     kafkaProducer = newKafkaPostCommitProducer(config);
     log.info("BlockingKafkaPostCommitHook initialized successfully");
   }
@@ -59,6 +64,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   @Override
   public void put(List<String> s3ObjectPaths, List<Long> s3ObjectToBaseRecordTimestamp) {
     try {
+      ensureProducer();
       kafkaProducer.beginTransaction();
       log.info("Transaction began");
 
@@ -81,10 +87,43 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
       throw new ConnectException(e);
     } catch (KafkaException e) {
-      log.error("Failed to produce to kafka, aborting transaction and will try again later", e);
-      kafkaProducer.abortTransaction();
+      log.error("Failed to produce to kafka, will roll back and retry", e);
+      rollbackTransaction();
       throw new RetriableException(e);
     }
+  }
+
+  private void ensureProducer() {
+    if (kafkaProducer == null) {
+      // Recreate lazily so a failure here surfaces as a (retriable) ConnectException from the
+      // producer factory and is retried by Connect, rather than being thrown from the error path.
+      kafkaProducer = newKafkaPostCommitProducer(config);
+    }
+  }
+
+  private void rollbackTransaction() {
+    if (kafkaProducer == null) {
+      return;
+    }
+    try {
+      kafkaProducer.abortTransaction();
+    } catch (KafkaException | IllegalStateException abortError) {
+      log.warn("Could not abort transaction; discarding producer so it is recreated on retry",
+              abortError);
+      discardProducer();
+    }
+  }
+
+  private void discardProducer() {
+    if (kafkaProducer == null) {
+      return;
+    }
+    try {
+      kafkaProducer.close(PRODUCER_CLOSE_TIMEOUT);
+    } catch (Exception e) {
+      log.warn("Failed to close transactional producer while discarding it", e);
+    }
+    kafkaProducer = null;
   }
 
   private String getLocalDateTime(String s3ObjectPath, Long baseRecordTimestamp) {
@@ -118,8 +157,11 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
   @Override
   public void close() {
+    if (kafkaProducer == null) {
+      return;
+    }
     try {
-      kafkaProducer.close();
+      kafkaProducer.close(PRODUCER_CLOSE_TIMEOUT);
     } catch (Exception e) {
       log.error("Failed to close kafka producer", e);
     }
@@ -145,6 +187,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       log.info("Transactions initialized");
     } catch (Exception e) {
       log.error("Failed to initiate transaction context", e);
+      kafkaProducer.close(PRODUCER_INIT_FAILURE_CLOSE_TIMEOUT);
       throw new ConnectException(e);
     }
     return kafkaProducer;
