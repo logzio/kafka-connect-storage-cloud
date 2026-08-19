@@ -85,6 +85,7 @@ public class ByteArrayRecordWriterProvider extends RecordViewSetter
 
           @Override
           public void close() throws IOException {
+            s3outWrapper.close();
           }
         }
     );
