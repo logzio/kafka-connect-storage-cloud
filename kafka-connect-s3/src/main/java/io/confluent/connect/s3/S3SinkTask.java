@@ -277,6 +277,12 @@ public class S3SinkTask extends SinkTask {
         topicPartitionWriters.put(tp, writer);
       }
     }
+
+    if (storage.shouldFlushEarly()) {
+      for (TopicPartition tp : topicPartitionWriters.keySet()) {
+        flushToS3(tp);
+      }
+    }
   }
 
   private boolean maybeSkipOnNullValue(SinkRecord record) {
