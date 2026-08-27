@@ -260,4 +260,8 @@ public class S3Storage implements Storage<S3SinkConnectorConfig, ObjectListing> 
         "File reading is not currently supported in S3 Connector"
     );
   }
+
+  public boolean shouldFlushEarly() {
+    return false;
+  }
 }

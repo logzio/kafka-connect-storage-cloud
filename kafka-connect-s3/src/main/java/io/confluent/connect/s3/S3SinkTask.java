@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import io.confluent.common.utils.SystemTime;
 import io.confluent.common.utils.Time;
@@ -262,20 +263,30 @@ public class S3SinkTask extends SinkTask {
     }
 
     for (TopicPartition tp : topicPartitionWriters.keySet()) {
-      TopicPartitionWriter writer = topicPartitionWriters.get(tp);
-      try {
-        writer.write();
-      } catch (RetriableException e) {
-        log.error("Exception on topic partition {}: ", tp, e);
-        Long currentStartOffset = writer.currentStartOffset();
-        if (currentStartOffset != null) {
-          context.offset(tp, currentStartOffset);
-        }
-        context.timeout(timeoutMs);
-        writer = newTopicPartitionWriter(tp);
-        writer.failureTime(time.milliseconds());
-        topicPartitionWriters.put(tp, writer);
+      recoverOnRetriable(tp, TopicPartitionWriter::write);
+    }
+
+    if (storage.shouldFlushEarly()) {
+      for (TopicPartition tp : topicPartitionWriters.keySet()) {
+        recoverOnRetriable(tp, TopicPartitionWriter::commitFiles);
       }
+    }
+  }
+
+  private void recoverOnRetriable(TopicPartition tp, Consumer<TopicPartitionWriter> action) {
+    TopicPartitionWriter writer = topicPartitionWriters.get(tp);
+    try {
+      action.accept(writer);
+    } catch (RetriableException e) {
+      log.error("Exception on topic partition {}: ", tp, e);
+      Long currentStartOffset = writer.currentStartOffset();
+      if (currentStartOffset != null) {
+        context.offset(tp, currentStartOffset);
+      }
+      context.timeout(timeoutMs);
+      writer = newTopicPartitionWriter(tp);
+      writer.failureTime(time.milliseconds());
+      topicPartitionWriters.put(tp, writer);
     }
   }
 
