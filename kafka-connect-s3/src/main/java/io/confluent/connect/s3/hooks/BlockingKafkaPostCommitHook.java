@@ -15,6 +15,10 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.errors.AuthorizationException;
+import org.apache.kafka.common.errors.OutOfOrderSequenceException;
+import org.apache.kafka.common.errors.ProducerFencedException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -84,11 +88,28 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
       Thread.currentThread().interrupt();
       discardProducer();
       throw new RetriableException(e);
-    } catch (ExecutionException | KafkaException e) {
-      log.error("Failed to produce post-commit notifications, discarding producer and retrying", e);
+    } catch (ExecutionException e) {
       discardProducer();
-      throw new RetriableException(e);
+      throw classify(e.getCause() != null ? e.getCause() : e);
+    } catch (KafkaException e) {
+      discardProducer();
+      throw classify(e);
     }
+  }
+
+  // Fail the task on fatal producer errors (bad ACLs, unsupported broker, idempotence sequence gap
+  // = possible data loss) so they alert, instead of retrying forever with no offset progress;
+  // everything else is transient → RetriableException (Connect re-consumes and re-notifies).
+  private RuntimeException classify(Throwable cause) {
+    if (cause instanceof AuthorizationException
+            || cause instanceof UnsupportedVersionException
+            || cause instanceof OutOfOrderSequenceException
+            || cause instanceof ProducerFencedException) {
+      log.error("Fatal error producing post-commit notifications, failing task", cause);
+      return new ConnectException(cause);
+    }
+    log.error("Failed to produce post-commit notifications, discarding producer and retrying", cause);
+    return new RetriableException(cause);
   }
 
   private void ensureProducer() {
