@@ -13,6 +13,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.errors.AuthorizationException;
 import org.apache.kafka.common.errors.OutOfOrderSequenceException;
@@ -35,9 +36,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 
 public class BlockingKafkaPostCommitHook implements PostCommitHook {
 
@@ -45,7 +47,6 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   private static final DateTimeFormatter timeFormatter =
           DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
   private static final Duration PRODUCER_CLOSE_TIMEOUT = Duration.ofSeconds(30);
-  private static final Duration PRODUCER_INIT_FAILURE_CLOSE_TIMEOUT = Duration.ofSeconds(5);
   private Pattern pattern;
   private String kafkaTopic;
   private S3SinkConnectorConfig config;
@@ -65,32 +66,50 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
   public void put(List<String> s3ObjectPaths, List<Long> s3ObjectToBaseRecordTimestamp) {
     try {
       ensureProducer();
-      kafkaProducer.beginTransaction();
-      log.info("Transaction began");
-
-      IntStream.range(0, s3ObjectPaths.size()).forEach(i -> {
-        List<Header> headers = new ArrayList<>();
+      List<Future<RecordMetadata>> sent = new ArrayList<>();
+      for (int i = 0; i < s3ObjectPaths.size(); i++) {
         String s3ObjectPath = s3ObjectPaths.get(i);
+        List<Header> headers = new ArrayList<>();
         headers.add(new RecordHeader("accountId", getAccountId(s3ObjectPath).getBytes()));
         headers.add(new RecordHeader("fileTimestamp", getLocalDateTime(s3ObjectPath,
                 s3ObjectToBaseRecordTimestamp.get(i)).getBytes()));
         headers.add(new RecordHeader("pathHash",
                 getPathHash(s3ObjectPath).getBytes()));
-        kafkaProducer.send(new ProducerRecord<>(kafkaTopic,
-                null, null, null, s3ObjectPath, headers));
-      });
+        sent.add(kafkaProducer.send(new ProducerRecord<>(kafkaTopic,
+                null, null, null, s3ObjectPath, headers)));
+      }
 
-      kafkaProducer.commitTransaction();
-      log.info("Transaction committed");
-    } catch (ProducerFencedException | AuthorizationException | UnsupportedVersionException
-             | IllegalStateException | OutOfOrderSequenceException e) {
-      log.error("Failed to begin transaction with unrecoverable exception, closing producer", e);
-      throw new ConnectException(e);
-    } catch (KafkaException e) {
-      log.error("Failed to produce to kafka, will roll back and retry", e);
-      rollbackTransaction();
+      // Block until every notification is acked before returning, so a failure re-consumes and
+      // re-notifies (at-least-once). Idempotent acks=all producer; no Kafka transaction.
+      for (Future<RecordMetadata> future : sent) {
+        future.get();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      discardProducer();
       throw new RetriableException(e);
+    } catch (ExecutionException e) {
+      discardProducer();
+      throw classify(e.getCause() != null ? e.getCause() : e);
+    } catch (KafkaException e) {
+      discardProducer();
+      throw classify(e);
     }
+  }
+
+  // Fail the task on fatal producer errors (bad ACLs, unsupported broker, idempotence sequence gap
+  // = possible data loss) so they alert, instead of retrying forever with no offset progress;
+  // everything else is transient → RetriableException (Connect re-consumes and re-notifies).
+  private RuntimeException classify(Throwable cause) {
+    if (cause instanceof AuthorizationException
+            || cause instanceof UnsupportedVersionException
+            || cause instanceof OutOfOrderSequenceException
+            || cause instanceof ProducerFencedException) {
+      log.error("Fatal error producing post-commit notifications, failing task", cause);
+      return new ConnectException(cause);
+    }
+    log.error("Failed to produce post-commit notifications, discarding producer and retrying", cause);
+    return new RetriableException(cause);
   }
 
   private void ensureProducer() {
@@ -101,19 +120,6 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     }
   }
 
-  private void rollbackTransaction() {
-    if (kafkaProducer == null) {
-      return;
-    }
-    try {
-      kafkaProducer.abortTransaction();
-    } catch (KafkaException | IllegalStateException abortError) {
-      log.warn("Could not abort transaction; discarding producer so it is recreated on retry",
-              abortError);
-      discardProducer();
-    }
-  }
-
   private void discardProducer() {
     if (kafkaProducer == null) {
       return;
@@ -121,7 +127,7 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     try {
       kafkaProducer.close(PRODUCER_CLOSE_TIMEOUT);
     } catch (Exception e) {
-      log.warn("Failed to close transactional producer while discarding it", e);
+      log.warn("Failed to close producer while discarding it", e);
     }
     kafkaProducer = null;
   }
@@ -176,21 +182,12 @@ public class BlockingKafkaPostCommitHook implements PostCommitHook {
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     String id = "blocking-kafka-producer-" + RandomStringUtils.randomAlphabetic(6);
     props.setProperty(ProducerConfig.CLIENT_ID_CONFIG, id);
-    props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, id);
+    props.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+    props.setProperty(ProducerConfig.ACKS_CONFIG, "all");
     props.setProperty(ProducerConfig.LINGER_MS_CONFIG, "10");
     props.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "gzip");
 
-    KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props);
-    try {
-      log.info("stating to initialize transactions");
-      kafkaProducer.initTransactions();
-      log.info("Transactions initialized");
-    } catch (Exception e) {
-      log.error("Failed to initiate transaction context", e);
-      kafkaProducer.close(PRODUCER_INIT_FAILURE_CLOSE_TIMEOUT);
-      throw new ConnectException(e);
-    }
-    return kafkaProducer;
+    return new KafkaProducer<>(props);
   }
 
 }
